@@ -1,0 +1,7 @@
+# Data
+*.bin
+*.json
+*.doc2vec
+
+# PyCharm Cache
+*.pyc
