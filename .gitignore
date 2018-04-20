@@ -2,6 +2,8 @@
 *.bin
 *.json
 *.doc2vec
+*.dat
+*.vocab
 
 # PyCharm Cache
 *.pyc

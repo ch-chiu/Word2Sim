@@ -4,12 +4,14 @@ from gensim.models import Word2Vec, KeyedVectors
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction import stop_words
 from sklearn.metrics import euclidean_distances
+from sklearn.externals import joblib
 from pyemd import emd
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
 # model = Word2Vec.load("data/word_model.mod")
-model = KeyedVectors.load_word2vec_format(dir_path + "/data/GoogleNews-vectors-negative300.bin", binary=True)
+# model = KeyedVectors.load_word2vec_format("data/GoogleNews-vectors-negative300.bin", binary=True)
+model = joblib.load("data/word_model.mod")
 
 
 def get_wmd_distance(d1, d2, min_vocab=7, verbose=False):

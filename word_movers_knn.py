@@ -4,7 +4,9 @@
 # License: Simplified BSD
 
 import numpy as np
+import logging
 from sklearn.metrics import euclidean_distances
+from sklearn.metrics.pairwise import cosine_distances, cosine_similarity
 from sklearn.externals.joblib import Parallel, delayed
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.utils import check_array
@@ -13,6 +15,8 @@ from sklearn.metrics.scorer import check_scoring
 from sklearn.preprocessing import normalize
 
 from pyemd import emd
+
+logger = logging.getLogger(__name__)
 
 
 class WordMoversKNN(KNeighborsClassifier):
@@ -59,7 +63,8 @@ class WordMoversKNN(KNeighborsClassifier):
         """
         union_idx = np.union1d(X_train[i].indices, row.indices)
         W_minimal = self.W_embed[union_idx]
-        W_dist = euclidean_distances(W_minimal)
+        # W_dist = euclidean_distances(W_minimal)
+        W_dist = cosine_distances(W_minimal)
         bow_i = X_train[i, union_idx].A.ravel()
         bow_j = row[:, union_idx].A.ravel()
         return emd(bow_i, bow_j, W_dist)
@@ -102,6 +107,10 @@ class WordMoversKNN(KNeighborsClassifier):
         dist = Parallel(n_jobs=self.n_jobs, verbose=self.verbose)(
             delayed(self._wmd_row, check_pickle=False)(test_sample, X_train)
             for test_sample in X_test)
+
+        # dist = []
+        # for test_sample in X_test:
+        #     dist.append(self._wmd_row(test_sample, X_train))
 
         return np.array(dist)
 
@@ -231,6 +240,7 @@ class WordMoversKNNCV(WordMoversKNN):
                               scorer(knn.set_params(n_neighbors=k), dist, y[test_ix])
                               for k in n_neighbors_try
                               ])
+            print("1 fold done!")
         scores = np.array(scores)
         self.cv_scores_ = scores
 

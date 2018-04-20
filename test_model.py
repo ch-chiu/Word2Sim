@@ -1,52 +1,63 @@
 import os
 import json
+import logging
 import numpy as np
+from time import time
 from gensim.models import KeyedVectors
 from sklearn import metrics
 from sklearn.model_selection import train_test_split
-from sklearn.datasets import fetch_20newsgroups
+from sklearn.datasets import fetch_20newsgroups, fetch_20newsgroups_vectorized
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
+from sklearn.externals import joblib
 from word_movers_knn import WordMoversKNN, WordMoversKNNCV
 
-W_common = KeyedVectors.load_word2vec_format('data/GoogleNews-vectors-negative300.bin', binary=True)
-wv = np.array(W_common.vectors, dtype=np.float64)
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-categories = [
-    # 'alt.atheism',
-    # 'comp.graphics',
-    # 'comp.os.ms-windows.misc',
-    # 'comp.sys.ibm.pc.hardware',
-    # 'comp.sys.mac.hardware',
-    # 'comp.windows.x',
-    # 'misc.forsale',
-    # 'rec.autos',
-    # 'rec.motorcycles',
-    # 'rec.sport.baseball',
-    # 'rec.sport.hockey',
-    # 'sci.crypt',
-    # 'sci.electronics',
-    # 'sci.med',
-    # 'sci.space',
-    # 'soc.religion.christian',
-    # 'talk.politics.guns',
-    # 'talk.politics.mideast',
-    'talk.politics.misc',
-    'talk.religion.misc'
-]
-twenty_train = fetch_20newsgroups(subset='train', categories=categories, shuffle=True, random_state=42)
+if __name__ == '__main__':
+    logger.info("Initialize")
+    t0 = time()
 
-count_vect = CountVectorizer()
-X_train = count_vect.fit_transform(twenty_train.data)
+    if not os.path.exists("data/embed.dat"):
+        print("Caching word embeddings in memmapped format...")
 
-# tfidf_transformer = TfidfTransformer()
-# X_train = tfidf_transformer.fit_transform(X_train)
-y_train = twenty_train.target
+        wv = KeyedVectors.load_word2vec_format('data/GoogleNews-vectors-negative300.bin', binary=True)
+        fp = np.memmap("data/embed.dat", dtype=np.float64, mode='w+', shape=wv.syn0.shape)
+        fp[:] = wv.syn0[:]
+        with open("data/embed.vocab", "w") as f:
+            for _, w in sorted((voc.index, word) for word, voc in wv.vocab.items()):
+                print(w, file=f)
+        del fp, wv
 
-# X_train, X_test, y_train, y_test = train_test_split(X_train_tfidf, twenty_train.target, test_size=.4, random_state=None)
+    W = np.memmap("data/embed.dat", dtype=np.float64, mode="r", shape=(3000000, 300))
+    with open("data/embed.vocab") as f:
+        vocab_list = map(str.strip, f.readlines())
 
-knn_cv = WordMoversKNNCV(cv=3,
-                         n_neighbors_try=range(1, 5),
-                         W_embed=wv, verbose=5, n_jobs=3)
-knn_cv.fit(X_train, y_train)
-print("CV score: {:.2f}".format(knn_cv.cv_scores_.mean(axis=0).max()))
+    vocab_dict = {w: k for k, w in enumerate(vocab_list)}
+
+    newsgroups = fetch_20newsgroups()
+    docs, y = newsgroups.data, newsgroups.target
+    docs_train, docs_test, y_train, y_test = train_test_split(docs, y,
+                                                              train_size=100,
+                                                              test_size=300,
+                                                              random_state=0)
+    vect = CountVectorizer(stop_words="english").fit(docs_train + docs_test)
+    common = [word for word in vect.get_feature_names() if word in vocab_dict]
+    W_common = W[[vocab_dict[w] for w in common]]
+
+    vect = CountVectorizer(vocabulary=common, dtype=np.double)
+    X_train = vect.fit_transform(docs_train)
+    X_test = vect.transform(docs_test)
+
+    t1 = time()
+    print("Finished loading data in {}s".format(t1 - t0))
+
+    knn_cv = WordMoversKNNCV(cv=3,
+                             n_neighbors_try=range(1, 5),
+                             W_embed=W_common, verbose=5, n_jobs=8)
+    print("Starting training model.")
+    knn_cv.fit(X_train, y_train)
+    joblib.dump(knn_cv, "knncv_model.m")
+    print("CV score: {:.2f}".format(knn_cv.cv_scores_.mean(axis=0).max()))
