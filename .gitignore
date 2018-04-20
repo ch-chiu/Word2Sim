@@ -4,6 +4,9 @@
 *.doc2vec
 *.dat
 *.vocab
+*.m
 
 # PyCharm Cache
 *.pyc
+*.xml
+*.iml
