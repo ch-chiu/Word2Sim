@@ -233,6 +233,7 @@ class WordMoversKNNCV(WordMoversKNN):
         scorer = check_scoring(knn, scoring=self.scoring)
 
         scores = []
+        cycle = 1
         for train_ix, test_ix in cv:
             dist = self._pairwise_wmd(X[test_ix], X[train_ix])
             knn.fit(X[train_ix], y[train_ix])
@@ -240,7 +241,8 @@ class WordMoversKNNCV(WordMoversKNN):
                               scorer(knn.set_params(n_neighbors=k), dist, y[test_ix])
                               for k in n_neighbors_try
                               ])
-            print("1 fold done!")
+            logger.info("%i/%i folds done!", cycle, self.cv)
+            cycle += 1
         scores = np.array(scores)
         self.cv_scores_ = scores
 

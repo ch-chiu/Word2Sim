@@ -1,15 +1,12 @@
 import os
-import json
 import logging
 import numpy as np
 from time import time
-from gensim.models import KeyedVectors
-from sklearn import metrics
 from sklearn.model_selection import train_test_split
-from sklearn.datasets import fetch_20newsgroups, fetch_20newsgroups_vectorized
+from sklearn.datasets import fetch_20newsgroups
 from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score, accuracy_score
 from sklearn.externals import joblib
-from word_movers_knn import WordMoversKNN, WordMoversKNNCV
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -57,14 +54,12 @@ if __name__ == '__main__':
     X_train = vect.fit_transform(docs_train)
     X_test = vect.transform(docs_test)
 
-    t1 = time()
-    logger.info("Finished loading data in %s", t1 - t0)
+    logger.info("Loading model.")
+    knn = joblib.load('model/knncv_model.m')
+    results = knn.predict(X_test)
 
-    # Training WordMoversKNNCV model
-    knn_cv = WordMoversKNNCV(cv=3,
-                             n_neighbors_try=range(1, 5),
-                             W_embed=W_common, verbose=5, n_jobs=8)
-    logger.info("Starting training model.")
-    knn_cv.fit(X_train, y_train)
-    joblib.dump(knn_cv, "knncv_model.m")
-    print("CV score: {:.2f}".format(knn_cv.cv_scores_.mean(axis=0).max()))
+    print("Classfication Report: %s\n", classification_report(y_test, results, target_names=newsgroups.target_names))
+    print("Confusion Matrix: %s\n", confusion_matrix(y_test, results))
+    print("Precision: {}".format(precision_score(y_test, results, average='weighted')))
+    print("Recall: {}".format(recall_score(y_test, results, average='weighted')))
+    print("Accuracy: {}".format(accuracy_score(y_test, results)))
