@@ -7,12 +7,11 @@ from gensim.models import KeyedVectors
 from sklearn.model_selection import train_test_split
 from sklearn.datasets import fetch_20newsgroups
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
-from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score, \
-    accuracy_score, roc_curve, roc_auc_score
 from sklearn.externals import joblib
+from gensim.models import Doc2Vec
 from word_movers_knn import WordMoversKNN, WordMoversKNNCV
 from sentiment import *
-import matplotlib.pyplot as plt
+from mydoc2vec import LabeledLineSentence, model2vec, d2v_knn
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -35,6 +34,7 @@ if __name__ == '__main__':
         print(len(sys.argv))
         raise SystemExit("Usage: Python train_model.py <data_set> <model_type>")
     data_set, model_type = sys.argv[1:3]
+    model_dir = "model/" + data_set + '_' + model_type + '.m'
 
     # Write vectors and vocabulary form GoogleNews-vectors into disk
     if not os.path.exists("data/embed.dat"):
@@ -58,6 +58,7 @@ if __name__ == '__main__':
 
     if data_set == '20newsgroup':
         # Load 20newsgroup data and split train/test set
+        class_len = len(catrgories)
         newsgroups = fetch_20newsgroups(categories=catrgories)
         docs, y = newsgroups.data, newsgroups.target
         docs_train, docs_test, y_train, y_test = train_test_split(docs, y,
@@ -66,24 +67,35 @@ if __name__ == '__main__':
                                                                   random_state=0)
     elif data_set == 'imdb':
         # Load IMDB data and split train/test set
+        class_len = 2
         train_pos, train_neg, test_pos, test_neg = load_data('data/imdb/')
         docs_train = train_pos + train_neg
         docs_test = test_pos + test_neg
+        docs = docs_train + docs_test
         y_train = np.c_[np.ones((1, len(train_pos)), dtype=np.float64),
                         np.zeros((1, len(train_neg)), dtype=np.float64)][0]
         y_test = np.c_[np.ones((1, len(test_pos)), dtype=np.float64),
                        np.zeros((1, len(test_neg)), dtype=np.float64)][0]
+        y = np.r_[y_train, y_test]
     elif data_set == 'twitter':
         # Load twitter data and split train/test set
+        class_len = 2
         train_pos, train_neg, test_pos, test_neg = load_data('data/twitter/')
         docs_train = train_pos + train_neg
         docs_test = test_pos + test_neg
+        docs = docs_train + docs_test
         y_train = np.c_[np.ones((1, len(train_pos)), dtype=np.float64),
                         np.zeros((1, len(train_neg)), dtype=np.float64)][0]
         y_test = np.c_[np.ones((1, len(test_pos)), dtype=np.float64),
                        np.zeros((1, len(test_neg)), dtype=np.float64)][0]
+        y = np.r_[y_train, y_test]
     else:
         raise SystemExit('No such dataset.')
+
+    joblib.dump(docs_train, 'data/docs_train.dat')
+    joblib.dump(docs_test, 'data/docs_test.dat')
+    joblib.dump(y_train, 'data/y_train.dat')
+    joblib.dump(y_test, 'data/y_test.dat')
 
     # Transfer bag of words to sparse matrix
     vect = TfidfVectorizer(stop_words="english").fit(docs_train + docs_test)
@@ -96,35 +108,47 @@ if __name__ == '__main__':
     X_train = vect.fit_transform(docs_train)
     X_test = vect.transform(docs_test)
 
-    t1 = time()
-    logger.info("Finished loading data in %fs", t1 - t0)
+    joblib.dump(X_train, 'data/X_train.dat')
+    joblib.dump(X_test, 'data/X_test.dat')
+
+    logger.info("Finished loading data in %fs", time() - t0)
 
     if model_type == 'WMS_CV':
         # Training WordMoversKNNCV model
         model = WordMoversKNNCV(cv=3,
-                                n_neighbors_try=range(1, 5),
+                                n_neighbors_try=range(1, class_len),
                                 W_embed=W_common, verbose=5, n_jobs=8)
         logger.info("Starting training model.")
         model.fit(X_train, y_train)
-        joblib.dump(model, "model/" + data_set + '_' + model_type + '.m')
+        results = model.predict(X_test)
+        joblib.dump(model, model_dir)
         print("CV score: {:.2f}".format(model.cv_scores_.mean(axis=0).max()))
     elif model_type == 'WMS':
         # Training WordMoversKNN model
         model = WordMoversKNN(W_embed=W_common, verbose=5, n_jobs=8)
         logger.info("Starting training model.")
         model.fit(X_train, y_train)
-        joblib.dump(model, "model/" + data_set + '_' + model_type + '.m')
-    # elif model_type == 'TF-IDF':
+        results = model.predict(X_test)
+        joblib.dump(model, model_dir)
+    elif model_type == 'doc2vec':
+        # Training Doc2Vec model
+        # sentences = LabeledLineSentence(docs, y)
+        # model = Doc2Vec(min_count=2, window=5, size=100, workers=8)
+        # model.build_vocab(sentences.to_array())
+        # for epoch in range(50):
+        #     logger.info('Epoch %d' % epoch)
+        #     model.train(sentences.sentences_perm(), total_examples=model.corpus_count, epochs=epoch)
+        # model.save(model_dir)
+        # model2vec(model)
+        model = Doc2Vec.load('model/20newsgroup_doc2vec.m')
+        array, label = model2vec(model)
+        results = d2v_knn(array, label, n_neighbors=class_len, n_jobs=8)
+    else:
+        raise SystemExit("Please indicate correct model type.")
 
-    results = model.predict(X_test)
 
-    print("Classfication Report: %s\n", classification_report(y_test, results))
-    print("Confusion Matrix: %s\n", confusion_matrix(y_test, results))
-    print("Precision: {}".format(precision_score(y_test, results, average='weighted')))
-    print("Recall: {}".format(recall_score(y_test, results, average='weighted')))
-    print("Accuracy: {}".format(accuracy_score(y_test, results)))
-    roc_auc = roc_auc_score(y_test, results)
-    fpr, tpr = roc_curve(y_test, results)
-    plt.figure()
-    plt.plot(fpr, tpr, label='Logistic Regression ROC curve (area = %0.6f)' % roc_auc)
+
+
+
+
 

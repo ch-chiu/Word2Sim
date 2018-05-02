@@ -30,7 +30,7 @@ def load_data(path_to_dir):
             # test_neg.append(words)
             test_neg.append(line)
 
-    return train_pos[0:200], train_neg[0:200], test_pos[0:50], test_neg[0:50]
+    return train_pos[0:1000], train_neg[0:1000], test_pos[0:100], test_neg[0:100]
 
 
 def evaluate_model(model, test_pos_vec, test_neg_vec, print_confusion=False):

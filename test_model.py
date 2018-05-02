@@ -2,12 +2,12 @@ import os
 import logging
 import numpy as np
 from time import time
-from sklearn.model_selection import train_test_split
-from sklearn.datasets import fetch_20newsgroups
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
-from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score, accuracy_score
+from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score, \
+    accuracy_score, roc_curve, roc_auc_score
 from sklearn.externals import joblib
 from sentiment import *
+import matplotlib.pyplot as plt
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -46,11 +46,20 @@ if __name__ == '__main__':
     X_test = vect.transform(docs_test)
 
     logger.info("Loading model.")
-    knn = joblib.load('model/knncv_model.m')
-    results = knn.predict(X_test)
+    model = joblib.load('model/imdb_WMS.m')
+    results = model.predict(X_test)
 
     print("Classfication Report: %s\n", classification_report(y_test, results))
     print("Confusion Matrix: %s\n", confusion_matrix(y_test, results))
     print("Precision: {}".format(precision_score(y_test, results, average='weighted')))
     print("Recall: {}".format(recall_score(y_test, results, average='weighted')))
     print("Accuracy: {}".format(accuracy_score(y_test, results)))
+    roc_auc = roc_auc_score(y_test, results)
+    fpr, tpr, thresholds = roc_curve(y_test, results)
+    plt.figure()
+    plt.plot(fpr, tpr, label='K-NN ROC curve (area = %0.6f)' % roc_auc)
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('K-NN Classification ROC AUC (WMS)')
+    # plt.legend(loc="lower right")
+    plt.show()

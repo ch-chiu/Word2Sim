@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2017 Zimeng Qiu <zqiu@vmware.com>, Pengzheng Cao, <pengzhencao@vmware.com>
+# Copyright (C) 2017 Zimeng Qiu <zqiu@vmware.com>
 # Licensed under the GNU LGPL v2.1 - http://www.gnu.org/licenses/lgpl.html
 
 """
