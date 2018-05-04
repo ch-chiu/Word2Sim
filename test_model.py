@@ -6,7 +6,7 @@ from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score, \
     accuracy_score, roc_curve, roc_auc_score
 from sklearn.externals import joblib
-from sentiment import *
+from utilities import *
 import matplotlib.pyplot as plt
 
 logging.basicConfig(level=logging.INFO,

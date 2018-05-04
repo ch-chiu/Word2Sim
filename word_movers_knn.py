@@ -200,10 +200,10 @@ class WordMoversKNNCV(WordMoversKNN):
 
     """
 
-    def __init__(self, W_embed, n_neighbors_try=None, scoring=None, cv=3,
+    def __init__(self, W_embed, n_neighbors=None, scoring=None, cv=3,
                  n_jobs=1, verbose=False):
         self.cv = cv
-        self.n_neighbors_try = n_neighbors_try
+        self.n_neighbors = n_neighbors
         self.scoring = scoring
         super(WordMoversKNNCV, self).__init__(W_embed,
                                               n_neighbors=None,
@@ -220,16 +220,17 @@ class WordMoversKNNCV(WordMoversKNN):
         y : ndarray, shape (n_samples,) or (n_samples, n_targets)
             Target
         """
-        if self.n_neighbors_try is None:
-            n_neighbors_try = range(1, 6)
+        if self.n_neighbors is None:
+            n_neighbors = 2
         else:
-            n_neighbors_try = self.n_neighbors_try
+            n_neighbors = self.n_neighbors
 
         X = check_array(X, accept_sparse='csr', copy=True)
         X = normalize(X, norm='l1', copy=False)
 
         cv = check_cv(self.cv, X, y)
-        knn = KNeighborsClassifier(metric='precomputed', algorithm='brute')
+        # knn = KNeighborsClassifier(metric='precomputed', algorithm='brute')
+        knn = KNeighborsClassifier(n_jobs=self.n_jobs)
         scorer = check_scoring(knn, scoring=self.scoring)
 
         scores = []
@@ -237,18 +238,19 @@ class WordMoversKNNCV(WordMoversKNN):
         for train_ix, test_ix in cv:
             dist = self._pairwise_wmd(X[test_ix], X[train_ix])
             knn.fit(X[train_ix], y[train_ix])
-            scores.append([
-                              scorer(knn.set_params(n_neighbors=k), dist, y[test_ix])
-                              for k in n_neighbors_try
-                              ])
+            # scores.append([
+            #                   scorer(knn.set_params(n_neighbors=k), dist, y[test_ix])
+            #                   for k in n_neighbors_try
+            #                   ])
+            scores.append(scorer(knn.set_params(n_neighbors=n_neighbors), dist, y[test_ix]))
             logger.info("%i/%i folds done!", cycle, self.cv)
             cycle += 1
         scores = np.array(scores)
         self.cv_scores_ = scores
 
-        best_k_ix = np.argmax(np.mean(scores, axis=0))
-        best_k = n_neighbors_try[best_k_ix]
-        self.n_neighbors = self.n_neighbors_ = best_k
+        # best_k_ix = np.argmax(np.mean(scores, axis=0))
+        # best_k = n_neighbors_try[best_k_ix]
+        # self.n_neighbors = self.n_neighbors_ = best_k
 
         return super(WordMoversKNNCV, self).fit(X, y)
 

@@ -1,4 +1,5 @@
-import numpy
+import numpy as np
+from sklearn.feature_extraction.text import CountVectorizer
 
 
 def load_data(path_to_dir):
@@ -33,29 +34,15 @@ def load_data(path_to_dir):
     return train_pos[0:1000], train_neg[0:1000], test_pos[0:100], test_neg[0:100]
 
 
-def evaluate_model(model, test_pos_vec, test_neg_vec, print_confusion=False):
-    """
-    Prints the confusion matrix and accuracy of the model.
-    """
-    # Use the predict function and calculate the true/false positives and true/false negative.
-    # YOUR CODE HERE
-    res = model.predict(test_pos_vec)
-    unique, counts = numpy.unique(res, return_counts=True)
-    d = dict(zip(unique, counts))
-    tp = float(d['pos'])
-    fn = float(d['neg'])
-    
-    res = model.predict(test_neg_vec)
-    unique, counts = numpy.unique(res, return_counts=True)
-    d = dict(zip(unique, counts))
-    tn = float(d['neg'])
-    fp = float(d['pos'])
-    accuracy = (tp + tn)/(tp + tn + fp + fn)
-    if print_confusion:
-        print("predicted:\tpos\tneg")
-        print("actual:")
-        print("pos\t\t%d\t%d" % (tp, fn))
-        print("neg\t\t%d\t%d" % (fp, tn))
-    print("accuracy: %f" % accuracy)
+def get_avg_vector(docs, tags, bow, wv):
+    doc_vect = []
+    doc_tags = []
+    for doc, tag in zip(docs, tags):
+        doc = [doc]
+        count_vect = bow.transform(doc)
+        vect = wv[count_vect.indices]
+        doc_vect.append(np.mean(vect, axis=0))
+        doc_tags.append(tag)
+    return doc_vect, doc_tags
 
 

@@ -75,8 +75,8 @@ def model2vec(model):
     return X, y
 
 
-def d2v_knn(X, y, n_neighbors=2, n_jobs=1):
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=200, random_state=42)
+def get_knn_results(X, y, n_neighbors=2, n_jobs=1):
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
     cls = KNeighborsClassifier(n_neighbors=n_neighbors, n_jobs=n_jobs)
     cls.fit(X_train, y_train)
     results = cls.predict(X_test)
@@ -93,7 +93,7 @@ def d2v_knn(X, y, n_neighbors=2, n_jobs=1):
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     plt.title('K-NN Classification ROC AUC (WMS)')
-    # plt.legend(loc="lower right")
+    plt.legend(loc="lower right")
     plt.show()
     return results
 
