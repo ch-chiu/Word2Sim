@@ -1,6 +1,6 @@
 import logging
 import sys
-import numpy
+import numpy as np
 from gensim import utils
 from gensim.models.doc2vec import TaggedDocument
 from random import shuffle
@@ -10,11 +10,20 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score, \
     accuracy_score, roc_curve, roc_auc_score
+from nltk.corpus import stopwords
+from nltk.tokenize import TweetTokenizer
+from nltk.stem.wordnet import WordNetLemmatizer
+from nltk.stem.porter import PorterStemmer
+
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 logger.info("running %s" % ' '.join(sys.argv))
+
+lem = WordNetLemmatizer()
+stem = PorterStemmer()
+tokenizer = TweetTokenizer()
 
 
 class LabeledLineSentence(object):
@@ -36,29 +45,41 @@ class LabeledLineSentence(object):
                     raise Exception('Non-unique prefix encountered')
 
     def __iter__(self):
-        if self.sources:
+        if self.sources is not None:
             for source, prefix in self.sources.items():
                 with utils.smart_open(source) as fin:
                     for item_no, line in enumerate(fin):
-                        yield TaggedDocument(utils.to_unicode(line).split(), [prefix + '_%s' % item_no])
+                        words = utils.simple_preprocess(line, min_len=2, max_len=20)
+                        words = [word.lower() for word in words if word.lower() not in stopwords]
+                        words = [lem.lemmatize(word) for word in words]
+                        yield TaggedDocument(words, [prefix + '_%s' % str(item_no)])
         else:
             item_no = 0
             for doc, label in zip(self.docs, self.labels):
                 item_no += 1
-                yield TaggedDocument(utils.to_unicode(doc).split(), [str(label) + '_%s' % item_no])
+                words = utils.simple_preprocess(doc)
+                words = [word for word in words if word not in stopwords.words('english')]
+                words = [lem.lemmatize(word) for word in words]
+                yield TaggedDocument(words, [str(label) + '_%s' % str(item_no)])
 
     def to_array(self):
-        if self.sources:
+        if self.sources is not None:
             for source, prefix in self.sources.items():
                 with utils.smart_open(source) as fin:
                     for item_no, line in enumerate(fin):
+                        words = utils.simple_preprocess(line)
+                        words = [word for word in words if word not in stopwords.words('english')]
+                        words = [lem.lemmatize(word) for word in words]
                         self.sentences.append(TaggedDocument(
-                            utils.to_unicode(line).split(), [prefix + '_%s' % item_no]))
+                            words, [prefix + '_%s' % str(item_no)]))
         else:
             item_no = 0
             for doc, label in zip(self.docs, self.labels):
+                words = utils.simple_preprocess(doc)
+                words = [word for word in words if word not in stopwords.words('english')]
+                words = [lem.lemmatize(word) for word in words]
                 self.sentences.append(TaggedDocument(
-                    utils.to_unicode(doc).split(), [str(label) + '_%s' % item_no]))
+                    words, [str(label) + '_%s' % str(item_no)]))
                 item_no += 1
         return self.sentences
 
@@ -70,7 +91,7 @@ class LabeledLineSentence(object):
 def model2vec(model):
     X = model.docvecs.doctag_syn0
     y = model.docvecs.doctags
-    y = [label[0] for label in y]
+    y = np.array([label[0] for label in y])
     joblib.dump((X, y), 'data/docvecs.data')
     return X, y
 

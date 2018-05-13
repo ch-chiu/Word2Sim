@@ -13,6 +13,7 @@ from sklearn.utils import check_array
 from sklearn.cross_validation import check_cv
 from sklearn.metrics.scorer import check_scoring
 from sklearn.preprocessing import normalize
+from sklearn.externals import joblib
 
 from pyemd import emd
 
@@ -112,6 +113,7 @@ class WordMoversKNN(KNeighborsClassifier):
         # for test_sample in X_test:
         #     dist.append(self._wmd_row(test_sample, X_train))
 
+        joblib.dump(np.array(dist), 'data/wms_dist.dat')
         return np.array(dist)
 
     def fit(self, X, y):

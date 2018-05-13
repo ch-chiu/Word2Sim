@@ -1,5 +1,4 @@
 import numpy as np
-from sklearn.feature_extraction.text import CountVectorizer
 
 
 def load_data(path_to_dir):

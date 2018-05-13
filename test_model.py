@@ -46,7 +46,7 @@ if __name__ == '__main__':
     X_test = vect.transform(docs_test)
 
     logger.info("Loading model.")
-    model = joblib.load('model/imdb_WMS.m')
+    model = joblib.load('model/20newsgroup_WMS.m')
     results = model.predict(X_test)
 
     print("Classfication Report: %s\n", classification_report(y_test, results))
@@ -54,12 +54,13 @@ if __name__ == '__main__':
     print("Precision: {}".format(precision_score(y_test, results, average='weighted')))
     print("Recall: {}".format(recall_score(y_test, results, average='weighted')))
     print("Accuracy: {}".format(accuracy_score(y_test, results)))
-    roc_auc = roc_auc_score(y_test, results)
-    fpr, tpr, thresholds = roc_curve(y_test, results)
+
     plt.figure()
-    plt.plot(fpr, tpr, label='K-NN ROC curve (area = %0.6f)' % roc_auc)
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('K-NN Classification ROC AUC (WMS)')
-    # plt.legend(loc="lower right")
+    for index in range(5):
+        fpr, tpr, thresholds = roc_curve(y_test, results)
+        plt.plot(fpr, tpr, label='ROC curve of class %s' % index)
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('K-NN Classification ROC AUC (WMS)')
+        plt.legend(loc="lower right")
     plt.show()

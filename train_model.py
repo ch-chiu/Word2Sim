@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import logging
 import numpy as np
 from time import time
@@ -9,10 +10,14 @@ from sklearn.datasets import fetch_20newsgroups
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.externals import joblib
 from gensim.models import Doc2Vec
+from gensim.similarities import WmdSimilarity
 from sklearn.neighbors import KNeighborsClassifier
 from word_movers_knn import WordMoversKNN, WordMoversKNNCV
 from utilities import *
 from mydoc2vec import LabeledLineSentence, model2vec, get_knn_results
+import matplotlib.pyplot as plt
+from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score, \
+    accuracy_score, roc_curve, roc_auc_score
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -89,6 +94,19 @@ if __name__ == '__main__':
         y_test = np.c_[np.ones((1, len(test_pos)), dtype=np.float64),
                        np.zeros((1, len(test_neg)), dtype=np.float64)][0]
         y = np.r_[y_train, y_test]
+    elif data_set == 'esx':
+        # Load esx bug data and split train/test set
+        class_len = 50
+        with open('data/esx/trainData.json') as f:
+            train_data = json.load(f)
+        with open('data/esx/testData.json') as f:
+            test_data = json.load(f)
+        docs_train = [doc['short_desc'] for doc in train_data]
+        docs_test = [doc['short_desc'] for doc in test_data]
+        y_train = [doc['component_id'] for doc in train_data]
+        y_test = [doc['component_id'] for doc in test_data]
+        docs = docs_train + docs_test
+        y = np.r_[y_train, y_test]
     else:
         raise SystemExit('No such dataset.')
 
@@ -107,7 +125,6 @@ if __name__ == '__main__':
     # Create fixed-vocabulary vectorizer using only the words we have embeddings for
     vect = TfidfVectorizer(vocabulary=common, dtype=np.double)
     count_vect = CountVectorizer(vocabulary=common, dtype=np.double)
-    corpus = count_vect.fit(docs)
     X_train = vect.fit_transform(docs_train)
     X_test = vect.transform(docs_test)
 
@@ -135,25 +152,26 @@ if __name__ == '__main__':
         results = model.predict(X_test)
         joblib.dump(model, model_dir)
     elif model_type == 'doc2vec':
-        # Training Doc2Vec model
-        sentences = LabeledLineSentence(docs, y)
-        model = Doc2Vec(min_count=2, window=5,
-                        size=100, workers=8)
-        model.build_vocab(sentences.to_array())
-        for epoch in range(50):
-            logger.info('Epoch %d' % epoch)
-            model.train(sentences.sentences_perm(),
-                        total_examples=model.corpus_count,
-                        epochs=epoch)
-        model.save(model_dir)
-        model2vec(model)
+        # # Training Doc2Vec model
+        # sentences = LabeledLineSentence(docs, y).to_array()
+        # model = Doc2Vec(min_count=2, window=5,
+        #                 size=100, workers=8)
+        # model.build_vocab(sentences)
+        # for epoch in range(50):
+        #     logger.info('Epoch %d' % epoch)
+        #     model.train(sentences,
+        #                 total_examples=model.corpus_count,
+        #                 epochs=epoch)
+        # model.save(model_dir)
+        # model2vec(model)
         # For debugging, uncomment this line
-        # model = Doc2Vec.load('model/20newsgroup_doc2vec.m')
+        model = Doc2Vec.load('model/esx_doc2vec.m')
         array, label = model2vec(model)
         results = get_knn_results(array, label, n_neighbors=class_len, n_jobs=8)
         joblib.dump(model, model_dir)
     elif model_type == 'average':
         doc_vect, doc_tags = get_avg_vector(docs, y, count_vect, wv=W_common)
+        joblib.dump((doc_vect, doc_tags), model_dir)
         results = get_knn_results(doc_vect, doc_tags, n_neighbors=class_len, n_jobs=8)
     else:
         raise SystemExit("Please indicate correct model type.")
